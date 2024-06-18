@@ -38,6 +38,7 @@ export const enum SourceTextDirection {
 export class RSSSource {
     sid: number
     url: string
+    originUrl?: string
     iconurl?: string
     name: string
     openTarget: SourceOpenTarget
@@ -61,6 +62,7 @@ export class RSSSource {
 
     static async fetchMetaData(source: RSSSource) {
         let feed = await parseRSS(source.url)
+        source.originUrl = feed.link
         if (!source.name) {
             if (feed.title) source.name = feed.title.trim()
             source.name = source.name || intl.get("sources.untitled")
@@ -413,35 +415,35 @@ export function toggleSourceHidden(source: RSSSource): AppThunk<Promise<void>> {
     }
 }
 
-// export function updateFavicon(
-//     sids?: number[],
-//     force = false
-// ): AppThunk<Promise<void>> {
-//     return async (dispatch, getState) => {
-//         const initSources = getState().sources
-//         if (!sids) {
-//             sids = Object.values(initSources)
-//                 .filter(s => s.iconurl === undefined)
-//                 .map(s => s.sid)
-//         } else {
-//             sids = sids.filter(sid => sid in initSources)
-//         }
-//         const promises = sids.map(async sid => {
-//             const url = initSources[sid].url
-//             let favicon = (await fetchFavicon(url)) || ""
-//             const source = getState().sources[sid]
-//             if (
-//                 source &&
-//                 source.url === url &&
-//                 (force || source.iconurl === undefined)
-//             ) {
-//                 source.iconurl = favicon
-//                 await dispatch(updateSource(source))
-//             }
-//         })
-//         await Promise.all(promises)
-//     }
-// }
+export function updateFavicon(
+    sids?: number[],
+    force = false
+): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        const initSources = getState().sources
+        if (!sids) {
+            sids = Object.values(initSources)
+                .filter(s => s.iconurl === undefined)
+                .map(s => s.sid)
+        } else {
+            sids = sids.filter(sid => sid in initSources)
+        }
+        const promises = sids.map(async sid => {
+            const { originUrl, url }= initSources[sid]
+            let favicon = (await fetchFavicon(originUrl || url)) || ""
+            const source = getState().sources[sid]
+            if (
+                source &&
+                source.url === url &&
+                (force || source.iconurl === undefined)
+            ) {
+                source.iconurl = favicon
+                await dispatch(updateSource(source))
+            }
+        })
+        await Promise.all(promises)
+    }
+}
 
 export function sourceReducer(
     state: SourceState = {},
